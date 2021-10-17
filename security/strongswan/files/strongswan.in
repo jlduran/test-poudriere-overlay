@@ -1,0 +1,106 @@
+#!/bin/sh
+# Start or stop strongswan
+
+# PROVIDE: strongswan
+# REQUIRE: DAEMON
+# BEFORE: LOGIN
+# KEYWORD: shutdown
+
+# strongswan_enable (bool):
+#	Set it to "YES" to enable strongswan
+#	Default is "NO"
+# strongswan_interface (string):
+#	Set the control interface to use.
+#	Valid options are:
+#	"stroke" for the old ipsec/starter interface
+#	"vici" for the newer swanctl interface
+#	Default is "%%INTERFACE%%"
+
+. /etc/rc.subr
+
+name=strongswan
+desc="Strongswan IPsec startup script"
+required_modules="ipsec"
+rcvar=strongswan_enable
+
+load_rc_config $name
+
+: ${strongswan_enable:=NO}
+: ${strongswan_interface:="%%INTERFACE%%"}
+
+extra_commands="reload statusall"
+
+case $strongswan_interface in
+[Ss][Tt][Rr][Oo][Kk][Ee])
+	# "stroke"
+	command="%%PREFIX%%/sbin/ipsec"
+	procname="/usr/local/libexec/ipsec/starter"
+	start_precmd=command_args=start
+	status_cmd="${command} status"
+	reload_cmd="${command} reload"
+	statusall_cmd="${command} statusall"
+	;;
+
+[Vv][Ii][Cc][Ii])
+	# "vici"
+	command=/usr/sbin/daemon
+	pidfile=/var/run/daemon-charon.pid
+	charon_command=%%PREFIX%%/libexec/ipsec/charon
+	charon_pidfile=/var/run/charon.pid
+	swanctl_command=%%PREFIX%%/sbin/swanctl
+	command_args="-rS -P ${pidfile} ${charon_command} --use-syslog"
+
+	required_files=${charon_command}
+	extra_commands="reload statusall"
+
+	start_cmd=${name}_swanctl_start
+	start_postcmd="${swanctl_command} --load-all --noprompt"
+	reload_cmd="strongswan_swanctl --reload-settings"
+	reload_postcmd=$start_postcmd
+	status_cmd="strongswan_swanctl --stats"
+	statusall_cmd="strongswan_swanctl --stats --list-conns --list-sas"
+	;;
+
+*)
+	# "default"
+	warn "\$strongswan_interface setting is invalid - options supported are \"stroke\" or \"vici\"."
+	exit 1
+	;;
+esac
+
+strongswan_swanctl_start()
+{
+	local _waitmax=5
+
+	check_startmsgs && echo "Starting ${name}."
+
+	${command} ${command_args}
+
+	# Need to wait for charon to finish startup,
+	# else vici socket is unreadable
+	while [ ! -f ${charon_pidfile} ] && [ ${_waitmax} -gt 0 ]; do
+		sleep 1
+		_waitmax=$((_waitmax - 1))
+	done
+}
+
+strongswan_swanctl()
+{
+	local _commands _c
+
+	_commands="$@"
+	if [ -z "$_commands" ]; then
+		return
+	fi
+
+	if [ -z "$rc_pid" ]; then
+		_run_rc_notrunning
+		return 1
+	fi
+
+	for _c in $_commands; do
+		${swanctl_command} $_c
+	done
+}
+
+run_rc_command "$1"

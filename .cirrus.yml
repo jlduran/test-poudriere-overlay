@@ -1,0 +1,27 @@
+poudriere_task:
+  freebsd_instance:
+    image_family: freebsd-14-0-snap
+    # XXX Do not max out, it increases the chances
+    #     of failures when building.
+    # cpu: 8
+    # memory: 8G
+
+  install_script:
+    - pkg install -y git poudriere-devel
+
+  jail_script:
+    - poudriere jail -c -j 13-0-RELEASE -v 13.0-RELEASE -K GENERIC
+
+  ports_script:
+    - poudriere ports -c -U https://git.freebsd.org/ports.git -B 2021Q4 -p quarterly
+    - poudriere ports -c -M $CIRRUS_WORKING_DIR -m null -p patches
+
+  build_script:
+    - poudriere bulk -j 13-0-RELEASE -p quarterly -O patches -f pkglist
+
+  prepare_artifacts_script:
+    - mkdir -p $CIRRUS_WORKING_DIR/pkg
+    - cp -a /usr/local/poudriere/data/packages/13-0-RELEASE-quarterly/All/* pkg
+
+  pkg_artifacts:
+    path: pkg/**
