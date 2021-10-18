@@ -4,7 +4,7 @@ Inspired by https://dan.langille.org/2019/08/10/poudriere-hooks/ and https://gis
 
 This repo is an example poudriere-ports overlay repo.
 
-It will be null-mounted to an actual ports tree, overlaying the local changes.
+It will be unionfs-mounted to an actual ports tree, overlaying the local changes.
 
 For the purpose of this demonstration, I have opted to build a patched strongSwan package with its rc script customized.
 

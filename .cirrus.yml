@@ -9,6 +9,10 @@ poudriere_task:
   install_script:
     - pkg install -y git poudriere-devel
 
+  patch_unionfs_branch_script:
+    - git clone -b unionfs-overlay https://github.com/jlduran/poudriere.git
+    - mv poudriere/src/share/poudriere/common.sh /usr/local/share/poudriere/common.sh
+
   jail_script:
     - poudriere jail -c -j 13-0-RELEASE -v 13.0-RELEASE -K GENERIC
 
